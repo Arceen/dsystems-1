@@ -1,0 +1,6 @@
+services:
+  app:
+    container_name: niloys_app
+    build:
+      context: .
+      dockerfile: ./docker/app/Dockerfile
