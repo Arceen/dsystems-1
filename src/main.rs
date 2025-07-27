@@ -124,6 +124,60 @@ async fn main() -> Result<()> {
     }
 }
 
+
+async fn check_node_health(address: &str) -> bool {
+    match tokio::time::timeout(
+        tokio::time::Duration::from_secs(2), // 2 second timeout
+        TcpStream::connect(address)
+    ).await {
+        Ok(Ok(_stream)) => {
+            println!("✅ Node {} is healthy", address);
+            true
+        },
+        Ok(Err(e)) => {
+            println!("❌ Node {} failed: {}", address, e);
+            false
+        },
+        Err(_) => {
+            println!("⏱️ Node {} timed out", address);
+            false
+        }
+    }
+}
+
+async fn update_node_status(registry: Arc<tokio::sync::RwLock<ServiceRegistry>>, node_id: String, is_healthy: bool) {
+    let mut write_registry = registry.write().await;
+
+    if let Some(node) = write_registry.nodes.get_mut(&node_id) {
+        let new_status = if is_healthy {
+            NodeStatus::Active
+        } else {
+            NodeStatus::Inactive
+        };
+
+        // Only log if status changed
+        if matches!((&node.status, &new_status),
+                   (NodeStatus::Active, NodeStatus::Inactive) |
+                   (NodeStatus::Inactive, NodeStatus::Active)) {
+            println!("🔄 Node {} status changed: {:?} -> {:?}",
+                     node_id, node.status, new_status);
+        }
+
+        node.status = new_status;
+    }
+}
+
+async fn log_registry_status(registry: &Arc<tokio::sync::RwLock<ServiceRegistry>>) {
+    let read_registry = registry.read().await;
+    let active_count = read_registry.nodes.values()
+        .filter(|node| matches!(node.status, NodeStatus::Active))
+        .count();
+    let total_count = read_registry.nodes.len();
+
+    println!("📊 Registry Status: {}/{} nodes active", active_count, total_count);
+}
+
+
 // Registry Server for Service Discovery
 async fn run_registry(port: u16) -> Result<()> {
     let registry = Arc::new(tokio::sync::RwLock::new(ServiceRegistry {
@@ -132,6 +186,39 @@ async fn run_registry(port: u16) -> Result<()> {
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
     println!("🌐 Service Registry running on port {}", port);
+    let cloned_registry = registry.clone();
+    // Health check task
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3));
+
+        loop {
+            interval.tick().await;
+
+            // Get snapshot of current nodes
+            let nodes_to_check: Vec<(String, String)> = {
+                let read_registry = cloned_registry.read().await;
+                read_registry.nodes.iter()
+                    .map(|(id, node)| (id.clone(), node.address.clone()))
+                    .collect()
+            };
+
+            // Check each node's health concurrently
+            let health_check_futures = nodes_to_check.into_iter().map(|(node_id, address)| {
+                let registry_clone = cloned_registry.clone();
+                async move {
+                    let is_healthy = check_node_health(&address).await;
+                    update_node_status(registry_clone, node_id, is_healthy).await;
+                }
+            });
+
+            // Wait for all health checks to complete
+            futures::future::join_all(health_check_futures).await;
+
+            // Log current status
+            log_registry_status(&cloned_registry).await;
+        }
+    });
+
 
     loop {
         let (stream, addr) = listener.accept().await?;
@@ -265,6 +352,7 @@ async fn handle_registry_connection(
     Ok(())
 }
 
+
 // Key-Value Node
 async fn run_node(id: String, port: u16, registry_addr: String) -> Result<()> {
     let storage = Arc::new(tokio::sync::RwLock::new(HashMap::<String, String>::new()));
@@ -377,7 +465,7 @@ async fn handle_node_connection(
 // Interactive Client
 async fn run_client(registry_addr: String) -> Result<()> {
     println!("🔍 Discovering nodes from registry...");
-    let nodes = discover_nodes(&registry_addr).await?;
+    let mut nodes = discover_nodes(&registry_addr).await?;
 
     if nodes.is_empty() {
         println!("❌ No active nodes found!");
@@ -426,6 +514,7 @@ async fn run_client(registry_addr: String) -> Result<()> {
             for node in &updated_nodes {
                 println!("  - {}", node);
             }
+            nodes = updated_nodes;
             continue;
         }
 
