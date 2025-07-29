@@ -21,7 +21,7 @@ pub async fn log_registry_status(registry: &Arc<tokio::sync::RwLock<ServiceRegis
         .count();
     let total_count = read_registry.nodes.len();
 
-    println!("📊 Registry Status: {}/{} nodes active", active_count, total_count);
+    println!("📊 Registry Status: {active_count}/{total_count} nodes active");
 }
 
 
@@ -31,8 +31,8 @@ pub async fn run_registry(port: u16) -> anyhow::Result<()> {
         nodes: HashMap::new(),
     }));
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
-    println!("🌐 Service Registry running on port {}", port);
+    let listener = TcpListener::bind(format!("127.0.0.1:{port}")).await?;
+    println!("🌐 Service Registry running on port {port}");
     let cloned_registry = registry.clone();
     // Health check task
     tokio::spawn(async move {
@@ -73,7 +73,7 @@ pub async fn run_registry(port: u16) -> anyhow::Result<()> {
 
         tokio::spawn(async move {
             if let Err(e) = handle_registry_connection(stream, registry_clone).await {
-                eprintln!("Registry connection error from {}: {:?}", addr, e);
+                eprintln!("Registry connection error from {addr}: {e:?}");
             }
         });
     }
@@ -92,7 +92,7 @@ pub async fn handle_registry_connection(
             Err(_) => break, // Client disconnected
         };
 
-        println!("📨 Registry received request: {:?}", request);
+        println!("📨 Registry received request: {request:?}");
 
         let response = match &request.params {
             RpcParams::Get { key } if key == "nodes" => {
@@ -106,7 +106,7 @@ pub async fn handle_registry_connection(
 
                 println!("🔍 Node discovery request - found {} active nodes", active_nodes.len());
                 for node in &active_nodes {
-                    println!("  - {}", node);
+                    println!("  - {node}");
                 }
 
                 println!("Sending discover reponse: {:#?}",
@@ -129,7 +129,7 @@ pub async fn handle_registry_connection(
                     let node_id = parts[0].to_string();
                     let ip = parts[1].to_string();
                     let port = parts[2].to_string();
-                    let address = format!("{}:{}", ip, port);
+                    let address = format!("{ip}:{port}");
 
                     let mut registry_write = registry.write().await;
                     registry_write.nodes.insert(node_id.clone(), NodeInfo {
@@ -138,7 +138,7 @@ pub async fn handle_registry_connection(
                         status: NodeStatus::Active,
                     });
 
-                    println!("📝 Registered node: {} at {}", node_id, format!("{}:{}", ip, port));
+                    println!("📝 Registered node: {} at {}:{}", node_id, ip, port);
 
                     RpcResponse {
                         id: request.id,
@@ -156,6 +156,7 @@ pub async fn handle_registry_connection(
             RpcParams::Put { key, value } if key != "register" => {
                 let read_registry = registry.read().await;
                 println!("read registry");
+                println!("value: {value}");
                 // Collect all node addresses
                 let node_addrs: Vec<String> = read_registry.nodes.values()
                     .map(|node| node.address.clone()).collect();

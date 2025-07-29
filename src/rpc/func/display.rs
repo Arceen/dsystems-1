@@ -5,7 +5,7 @@ pub fn display_response(response: RpcResponse) {
     match response.result {
         Some(RpcResult::GetResult { value }) => {
             match value {
-                Some(v) => println!("✅ Found: {}", v),
+                Some(v) => println!("✅ Found: {v}"),
                 None => println!("❌ Key not found"),
             }
         }
@@ -19,15 +19,15 @@ pub fn display_response(response: RpcResponse) {
         Some(RpcResult::ListResult { keys }) => {
             println!("📋 Keys ({}):", keys.len());
             for key in keys {
-                println!("  - {}", key);
+                println!("  - {key}");
             }
         }
         Some(RpcResult::PingResult { response }) => {
-            println!("🏓 {}", response);
+            println!("🏓 {response}");
         }
         None => {
             if let Some(error) = response.error {
-                println!("❌ Error: {}", error);
+                println!("❌ Error: {error}");
             }
         }
     }

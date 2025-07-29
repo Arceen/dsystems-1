@@ -24,7 +24,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
 
     println!("✅ Found {} active nodes:", nodes.len());
     for node in &nodes {
-        println!("  - {}", node);
+        println!("  - {node}");
     }
 
     let stdin = tokio::io::stdin();
@@ -62,7 +62,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
             let updated_nodes = discover_nodes(&registry_addr).await?;
             println!("Active nodes:");
             for node in &updated_nodes {
-                println!("  - {}", node);
+                println!("  - {node}");
             }
             nodes = updated_nodes;
             continue;
@@ -71,7 +71,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
         let request = match parse_client_command(trimmed, request_id) {
             Ok(req) => req,
             Err(e) => {
-                println!("❌ {}", e);
+                println!("❌ {e}");
                 continue;
             }
         };
@@ -81,7 +81,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
                 // Hit registry for put request
                 match execute_rpc_call(&registry_addr, request).await {
                     Ok(response) => display_response(response),
-                    Err(e) => println!("❌ RPC call failed: {:?}", e),
+                    Err(e) => println!("❌ RPC call failed: {e:?}"),
                 }
             }
             _ => {
@@ -95,7 +95,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
 
                 match execute_rpc_call(&node_addr, request).await {
                     Ok(response) => display_response(response),
-                    Err(e) => println!("❌ RPC call failed: {:?}", e),
+                    Err(e) => println!("❌ RPC call failed: {e:?}"),
                 }
             }
 
@@ -110,7 +110,7 @@ pub async fn run_client(registry_addr: String) -> anyhow::Result<()> {
 }
 
 pub async fn discover_nodes(registry_addr: &str) -> anyhow::Result<Vec<String>> {
-    println!("🔍 Connecting to registry at: {}", registry_addr);
+    println!("🔍 Connecting to registry at: {registry_addr}");
     let mut stream = TcpStream::connect(registry_addr).await
         .map_err(|e| anyhow::anyhow!("Failed to connect to registry {}: {}", registry_addr, e))?;
 
@@ -126,7 +126,7 @@ pub async fn discover_nodes(registry_addr: &str) -> anyhow::Result<Vec<String>> 
     println!("📥 Waiting for registry response...");
     let response: RpcResponse = read_rpc_frame(&mut stream).await?;
 
-    println!("📨 Registry response: {:?}", response);
+    println!("📨 Registry response: {response:?}");
 
     match response.result {
         Some(RpcResult::ListResult { keys }) => {
@@ -134,7 +134,7 @@ pub async fn discover_nodes(registry_addr: &str) -> anyhow::Result<Vec<String>> 
             Ok(keys)
         }
         Some(other) => {
-            println!("❌ Unexpected response type: {:?}", other);
+            println!("❌ Unexpected response type: {other:?}");
             Ok(vec![])
         }
         None => {

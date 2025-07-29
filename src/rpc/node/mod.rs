@@ -15,8 +15,8 @@ pub async fn run_node(id: String, port: u16, registry_addr: String) -> anyhow::R
     // Register with service discovery
     register_with_registry(&id, port, &registry_addr).await?;
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
-    println!("🚀 Node '{}' running on port {}", id, port);
+    let listener = TcpListener::bind(format!("127.0.0.1:{port}")).await?;
+    println!("🚀 Node '{id}' running on port {port}");
 
     loop {
         let (stream, addr) = listener.accept().await?;
@@ -25,14 +25,14 @@ pub async fn run_node(id: String, port: u16, registry_addr: String) -> anyhow::R
 
         tokio::spawn(async move {
             if let Err(e) = handle_node_connection(stream, storage_clone, node_id).await {
-                eprintln!("Node connection error from {}: {:?}", addr, e);
+                eprintln!("Node connection error from {addr}: {e:?}");
             }
         });
     }
 }
 
 async fn register_with_registry(node_id: &str, port: u16, registry_addr: &str) -> anyhow::Result<()> {
-    println!("🔗 Connecting to registry at: {}", registry_addr);
+    println!("🔗 Connecting to registry at: {registry_addr}");
     let mut stream = TcpStream::connect(registry_addr).await
         .map_err(|e| anyhow::anyhow!("Failed to connect to registry {}: {}", registry_addr, e))?;
 
@@ -41,7 +41,7 @@ async fn register_with_registry(node_id: &str, port: u16, registry_addr: &str) -
         method: "put".to_string(),
         params: RpcParams::Put {
             key: "register".to_string(),
-            value: format!("{}:127.0.0.1:{}", node_id, port),
+            value: format!("{node_id}:127.0.0.1:{port}"),
         },
     };
 
@@ -49,7 +49,7 @@ async fn register_with_registry(node_id: &str, port: u16, registry_addr: &str) -
     send_rpc_frame(&mut stream, &request).await?;
     let response: RpcResponse = read_rpc_frame(&mut stream).await?;
 
-    println!("📨 Registry response: {:?}", response);
+    println!("📨 Registry response: {response:?}");
 
     if response.error.is_some() {
         anyhow::bail!("Registration failed: {:?}", response.error);
@@ -105,7 +105,7 @@ pub async fn handle_node_connection(
                 RpcResponse {
                     id: request.id,
                     result: Some(RpcResult::PingResult {
-                        response: format!("pong from {}: {}", node_id, message)
+                        response: format!("pong from {node_id}: {message}")
                     }),
                     error: None,
                 }

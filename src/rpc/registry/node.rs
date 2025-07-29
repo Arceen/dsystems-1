@@ -9,15 +9,15 @@ pub async fn check_node_health(address: &str) -> bool {
         TcpStream::connect(address)
     ).await {
         Ok(Ok(_stream)) => {
-            println!("✅ Node {} is healthy", address);
+            println!("✅ Node {address} is healthy");
             true
         },
         Ok(Err(e)) => {
-            println!("❌ Node {} failed: {}", address, e);
+            println!("❌ Node {address} failed: {e}");
             false
         },
         Err(_) => {
-            println!("⏱️ Node {} timed out", address);
+            println!("⏱️ Node {address} timed out");
             false
         }
     }
