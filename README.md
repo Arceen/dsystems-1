@@ -1,4 +1,4 @@
-# Distributed KV Store w/ node/client cluster & centralized registry
+# Distributed Key Value Store with node/client clusters and centralized registry
 Cluster of nodes share keys by registering themselves on a central registry system. Client can query registry system for available nodes. and Get/Set KV from any of those nodes
 
 ## Features checklist
